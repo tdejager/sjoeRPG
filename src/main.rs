@@ -1,6 +1,9 @@
 use bracket_lib::prelude::*;
+use legion::*;
 
-struct State { }
+struct State {
+    world: World
+}
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
@@ -15,5 +18,5 @@ fn main() -> BError {
         .with_title("SjoeRPG - Play your life!")
         .build()?;
 
-    main_loop(context, State{})
+    main_loop(context, State{ world: World::default()})
 }
