@@ -1,6 +1,6 @@
-use bracket_lib::prelude::*;
-use crate::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use crate::camera::Camera;
+use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use bracket_lib::prelude::*;
 
 const NUM_TILES: usize = (crate::SCREEN_WIDTH * crate::SCREEN_HEIGHT) as usize;
 
@@ -12,28 +12,27 @@ pub enum TileType {
 
 /// The map the hero walks on
 pub struct Map {
-    pub tiles: Vec<TileType>
+    pub tiles: Vec<TileType>,
 }
 
 impl Map {
     /// Create a new map
     pub fn new() -> Self {
         Self {
-            tiles: vec![TileType::Floor; NUM_TILES]
+            tiles: vec![TileType::Floor; NUM_TILES],
         }
     }
 
     /// Is this point in bounds of the map
-    pub fn in_bounds(&self, point: Point) -> bool {
-        point.x >= 0 && point.x <= SCREEN_WIDTH
-            && point.y >= 0 && point.y <= SCREEN_HEIGHT
+    pub fn in_bounds(&self, point: &Point) -> bool {
+        point.x >= 0 && point.x <= SCREEN_WIDTH && point.y >= 0 && point.y <= SCREEN_HEIGHT
     }
 
     pub fn render(&self, ctx: &mut BTerm, camera: &Camera) {
         ctx.set_active_console(0);
         for y in camera.top_y..=camera.bottom_y {
             for x in camera.left_x..camera.right_x {
-                if self.in_bounds(Point::new(x, y)) {
+                if self.in_bounds(&Point::new(x, y)) {
                     let idx = map_idx(x, y);
                     match self.tiles[idx] {
                         TileType::Floor => {
@@ -59,10 +58,14 @@ impl Map {
             }
         }
     }
+
+    /// Checks if this tile can be entered
+    pub fn can_enter_tile(&self, position: &Point) -> bool {
+        self.in_bounds(position) && self.tiles[map_idx(position.x, position.y)] == TileType::Floor
+    }
 }
 
 /// Get the index of the map
 pub fn map_idx(x: i32, y: i32) -> usize {
     (crate::SCREEN_WIDTH * y + x) as usize
 }
-

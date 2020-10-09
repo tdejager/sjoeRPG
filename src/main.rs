@@ -1,7 +1,7 @@
 use bracket_lib::prelude::*;
+use camera::Camera;
 use legion::world::SubWorld;
 use legion::*;
-use camera::Camera;
 use map::Map;
 
 const SCREEN_WIDTH: i32 = 80;
@@ -22,7 +22,7 @@ struct State {
 impl State {
     fn new() -> Self {
         let mut world = World::default();
-        let player_position = Point{ x: 5,  y: 5 };
+        let player_position = Point { x: 5, y: 5 };
         // Spawn our hero: Sjoerd
         spawn_hero(&mut world, player_position.clone());
         let mut resources = Resources::default();
@@ -80,7 +80,12 @@ pub fn entity_render(ecs: &SubWorld, #[resource] camera: &Camera) {
 #[system]
 #[write_component(Point)]
 #[read_component(Sjoerd)]
-pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>, #[resource] camera: &mut Camera) {
+pub fn sjoerd_input(
+    ecs: &mut SubWorld,
+    #[resource] key: &Option<VirtualKeyCode>,
+    #[resource] camera: &mut Camera,
+    #[resource] map: &mut Map,
+) {
     if let Some(key) = key {
         let delta = match key {
             VirtualKeyCode::Left => Point::new(-1, 0),
@@ -90,17 +95,17 @@ pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>
             _ => Point::new(0, 0),
         };
 
-
         // Move if something has actually moved
         if delta.x != 0 || delta.y != 0 {
             // Get all our sjens
             let mut sjens = <&mut Point>::query().filter(component::<Sjoerd>());
-
             // Move them
             sjens.iter_mut(ecs).for_each(|pos| {
                 let destination = *pos + delta;
-                *pos = destination;
-                camera.on_player_move(destination);
+                if map.can_enter_tile(&destination) {
+                    *pos = destination;
+                    camera.on_player_move(destination);
+                }
             });
         }
     }
@@ -108,7 +113,6 @@ pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
-
         // Clear both consoles
         ctx.set_active_console(0);
         ctx.cls();
