@@ -1,6 +1,8 @@
 use bracket_lib::prelude::*;
 use legion::world::SubWorld;
 use legion::*;
+use camera::Camera;
+use map::Map;
 
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
@@ -8,6 +10,7 @@ const DISPLAY_WIDTH: i32 = SCREEN_WIDTH / 2;
 const DISPLAY_HEIGHT: i32 = SCREEN_HEIGHT / 2;
 
 mod camera;
+mod map;
 
 // State of the World
 struct State {
@@ -19,9 +22,12 @@ struct State {
 impl State {
     fn new() -> Self {
         let mut world = World::default();
-
+        let player_position = Point{ x: 5,  y: 5 };
         // Spawn our hero: Sjoerd
-        spawn_hero(&mut world, Point { x: 5, y: 5 });
+        spawn_hero(&mut world, player_position.clone());
+        let mut resources = Resources::default();
+        resources.insert(Camera::new(player_position));
+        resources.insert(Map::new());
 
         Self {
             world,
@@ -29,7 +35,7 @@ impl State {
                 .add_system(entity_render_system())
                 .add_system(sjoerd_input_system())
                 .build(),
-            resources: Resources::default(),
+            resources,
         }
     }
 }
@@ -58,13 +64,14 @@ pub fn spawn_hero(ecs: &mut World, pos: Point) {
 #[system]
 #[read_component(Point)]
 #[read_component(Render)]
-pub fn entity_render(ecs: &SubWorld) {
+pub fn entity_render(ecs: &SubWorld, #[resource] camera: &Camera) {
     let mut draw_batch = DrawBatch::new();
-    draw_batch.target(0);
+    draw_batch.target(1);
+    let camera_offset = Point::new(camera.left_x, camera.top_y);
     <(&Point, &Render)>::query()
         .iter(ecs)
         .for_each(|(pos, render)| {
-            draw_batch.set(*pos, render.color, render.glyph);
+            draw_batch.set(*pos - camera_offset, render.color, render.glyph);
         });
 
     draw_batch.submit(5000).expect("Batch error");
@@ -73,7 +80,7 @@ pub fn entity_render(ecs: &SubWorld) {
 #[system]
 #[write_component(Point)]
 #[read_component(Sjoerd)]
-pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>) {
+pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>, #[resource] camera: &mut Camera) {
     if let Some(key) = key {
         let delta = match key {
             VirtualKeyCode::Left => Point::new(-1, 0),
@@ -86,10 +93,14 @@ pub fn sjoerd_input(ecs: &mut SubWorld, #[resource] key: &Option<VirtualKeyCode>
 
         // Move if something has actually moved
         if delta.x != 0 || delta.y != 0 {
+            // Get all our sjens
             let mut sjens = <&mut Point>::query().filter(component::<Sjoerd>());
+
+            // Move them
             sjens.iter_mut(ecs).for_each(|pos| {
                 let destination = *pos + delta;
                 *pos = destination;
+                camera.on_player_move(destination);
             });
         }
     }
@@ -103,6 +114,16 @@ impl GameState for State {
         ctx.cls();
         ctx.set_active_console(1);
         ctx.cls();
+
+        {
+            let camera = self.resources.get::<Camera>();
+            let map = self.resources.get::<Map>();
+            if let Some(camera) = camera {
+                if let Some(map) = map {
+                    map.render(ctx, &camera);
+                }
+            }
+        }
 
         // Insert a key as a resource
         self.resources.insert(ctx.key);
